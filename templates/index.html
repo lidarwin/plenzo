@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Plenzo – Deal Search</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <h1 class="logo">Plenzo</h1>
+      <p class="subtitle">Find the top deals from Slickdeals in seconds.</p>
+    </header>
+
+    <main class="content">
+      <form id="search-form" class="search-form">
+        <input
+          id="query"
+          type="text"
+          placeholder="Search for a deal (e.g. camera, laptop, SSD)"
+          autocomplete="off"
+          required
+        />
+        <button type="submit">Search</button>
+      </form>
+
+      <p id="status" class="status"></p>
+
+      <section id="results" class="results-grid"></section>
+    </main>
+
+    <footer class="footer">
+      <small>Powered by Plenzo & Slickdeals scraping.</small>
+    </footer>
+  </div>
+
+  <script>
+    const form = document.getElementById("search-form");
+    const queryInput = document.getElementById("query");
+    const statusEl = document.getElementById("status");
+    const resultsEl = document.getElementById("results");
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      const q = queryInput.value.trim();
+      if (!q) return;
+
+      statusEl.textContent = "Searching deals...";
+      statusEl.className = "status status--loading";
+      resultsEl.innerHTML = "";
+
+      try {
+        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || "Search failed.");
+        }
+
+        const deals = data.results || [];
+        if (deals.length === 0) {
+          statusEl.textContent = `No deals found for "${data.query}".`;
+          statusEl.className = "status status--empty";
+          return;
+        }
+
+        statusEl.textContent = `Top ${deals.length} deals for "${data.query}":`;
+        statusEl.className = "status status--ok";
+
+        deals.forEach((deal) => {
+          const card = document.createElement("article");
+          card.className = "deal-card";
+
+          const imgUrl = deal.imageUrl || "";
+          const imgHtml = imgUrl
+            ? `<div class="deal-card__image-wrapper">
+                 <img src="${imgUrl}" alt="${escapeHtml(deal.title)}" loading="lazy">
+               </div>`
+            : "";
+
+          card.innerHTML = `
+            ${imgHtml}
+            <div class="deal-card__body">
+              <div class="deal-card__rank">#${deal.rank || ""}</div>
+              <h2 class="deal-card__title">
+                <a href="${deal.link}" target="_blank" rel="noopener noreferrer">
+                  ${escapeHtml(deal.title || "Untitled deal")}
+                </a>
+              </h2>
+            </div>
+          `;
+
+          resultsEl.appendChild(card);
+        });
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = "Something went wrong. Try again.";
+        statusEl.className = "status status--error";
+      }
+    });
+
+    // Basic HTML escaping to prevent issues with deal titles
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+  </script>
+</body>
+</html>
